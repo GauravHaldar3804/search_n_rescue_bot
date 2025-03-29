@@ -2,10 +2,10 @@ import RPi.GPIO as GPIO
 import time
 
 # Pin definitions for BTS7960 with separate R_EN and L_EN
-IN1 = 17  # RPWM: Forward PWM
-IN2 = 27  # LPWM: Reverse PWM
-R_EN = 22 # Right Enable (forward)
-L_EN = 23 # Left Enable (reverse)
+IN1 = 17  # RPWM: Forward PWM input (Physical Pin 11)
+IN2 = 27  # LPWM: Reverse PWM input (Physical Pin 13)
+R_EN = 22 # Right Enable (forward) (Physical Pin 15)
+L_EN = 23 # Left Enable (reverse) (Physical Pin 16)
 
 # Setup GPIO
 GPIO.setmode(GPIO.BOARD)  # Use physical pin numbering
@@ -22,7 +22,7 @@ pwm_reverse = GPIO.PWM(IN2, 1000)  # 1000 Hz
 pwm_forward.start(0)
 pwm_reverse.start(0)
 
-# Enable both half-bridges of the BTS7960
+# Enable both half-bridges
 GPIO.output(R_EN, GPIO.HIGH)
 GPIO.output(L_EN, GPIO.HIGH)
 
@@ -32,39 +32,33 @@ def set_motor_speed(direction, speed):
     :param direction: 'forward' or 'reverse'
     :param speed: 0-100 (percentage of max speed)
     """
+    speed = max(0, min(100, speed))  # Constrain speed to 0-100
     if direction == "forward":
         pwm_forward.ChangeDutyCycle(speed)
         pwm_reverse.ChangeDutyCycle(0)
-        print(f"Moving forward at {speed}% speed")
+        print(f"Forward: {speed}%")
     elif direction == "reverse":
         pwm_forward.ChangeDutyCycle(0)
         pwm_reverse.ChangeDutyCycle(speed)
-        print(f"Moving reverse at {speed}% speed")
+        print(f"Reverse: {speed}%")
     else:
-        print("Invalid direction! Use 'forward' or 'reverse'")
+        print("Invalid direction!")
 
 def stop_motor():
     """Stop the motor"""
     pwm_forward.ChangeDutyCycle(0)
     pwm_reverse.ChangeDutyCycle(0)
-    print("Stopping")
+    print("Stopped")
 
-# Example usage
+# Main loop
 try:
     while True:
-        # Forward at 50% speed for 2 seconds
-        set_motor_speed("forward", 50)
+        set_motor_speed("forward", 50)  # 50% speed forward
         time.sleep(2)
-
-        # Stop for 1 second
         stop_motor()
         time.sleep(1)
-
-        # Reverse at 75% speed for 2 seconds
-        set_motor_speed("reverse", 75)
+        set_motor_speed("reverse", 75)  # 75% speed reverse
         time.sleep(2)
-
-        # Stop for 1 second
         stop_motor()
         time.sleep(1)
 
