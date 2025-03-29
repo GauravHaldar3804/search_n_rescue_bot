@@ -12,22 +12,30 @@ class GPSNode(Node):
         self.publisher = self.create_publisher(NavSatFix, 'gps_data', 10)
         self.timer = self.create_timer(1.0, self.read_gps)
 
-        # Open UART connection (adjust port based on your setup)
+        # Attempt to open the serial port
         try:
-            self.ser = serial.Serial('/dev/serial0', 9600, timeout=1)  # Use /dev/ttyS0 if needed
+            self.ser = serial.Serial('/dev/serial0', 9600, timeout=1)  # Adjust port if necessary
             self.get_logger().info("GPS Node Started on /dev/serial0")
         except Exception as e:
             self.get_logger().error(f"Failed to connect to GPS module. Check wiring! Exception: {e}")
-            self.ser = None  # Ensure self.ser is always defined
+            self.ser = None  # Ensure self.ser is defined
 
     def read_gps(self):
-        # Check if the serial connection was successfully established
+        # This debug statement prints every time the loop executes.
+        self.get_logger().debug("Loop executed")
+
+        # Verify that the serial connection exists
         if self.ser is None:
             return
 
+        # Check if data is available
         if self.ser.in_waiting > 0:
             try:
+                # Read and decode the incoming line
                 line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                self.get_logger().debug(f"Raw line received: {line}")  # Debug logging
+
+                # Process only $GPGGA sentences
                 if line.startswith('$GPGGA'):
                     data = pynmea2.parse(line)
                     latitude = self.convert_to_decimal(data.latitude, data.lat_dir)
@@ -44,7 +52,9 @@ class GPSNode(Node):
                 self.get_logger().warn(f"GPS Parsing Error: {e}")
 
     def convert_to_decimal(self, value, direction):
-        """Convert latitude/longitude from DDMM.MMMM to decimal degrees (DD.DDDDDD)"""
+        """
+        Convert a coordinate from degrees and minutes (DDMM.MMMM) to decimal degrees (DD.DDDDDD)
+        """
         if not value:
             return 0.0
         degrees = int(float(value) / 100)
