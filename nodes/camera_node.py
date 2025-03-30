@@ -19,8 +19,8 @@ class PiCameraNode(Node):
       
        # Initialize camera
        self.cap = cv2.VideoCapture(0)
-       self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-       self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+       self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+       self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
        self.cap.set(cv2.CAP_PROP_FPS, 30)
       
        if not self.cap.isOpened():
