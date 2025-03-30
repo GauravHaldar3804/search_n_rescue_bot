@@ -14,7 +14,7 @@ class PiCameraNode(Node):
         self.bridge = CvBridge()
 
         # Initialize the camera using V4L2 backend
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         # Lower the resolution and frame rate to reduce memory usage
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
