@@ -16,9 +16,9 @@ class PiCameraNode(Node):
         # Initialize the camera using V4L2 backend
         self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         # Lower the resolution and frame rate to reduce memory usage
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.cap.set(cv2.CAP_PROP_FPS, 15)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
 
         # Debug: Log camera properties
         width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
