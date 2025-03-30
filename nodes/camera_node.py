@@ -21,7 +21,7 @@ class PiCameraNode(Node):
        self.cap = cv2.VideoCapture(0)
        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-       self.cap.set(cv2.CAP_PROP_FPS, 30)
+       self.cap.set(cv2.CAP_PROP_FPS, 15)
       
        if not self.cap.isOpened():
            self.get_logger().error("Failed to open Raspberry Pi Camera Module")
