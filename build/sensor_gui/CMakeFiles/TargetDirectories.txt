@@ -1,9 +1,0 @@
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/uninstall.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/sensor_gui_uninstall.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/test.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/edit_cache.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/rebuild_cache.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/list_install_components.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/install.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/install/local.dir
-/home/aaditi/ros2_ws/build/sensor_gui/CMakeFiles/install/strip.dir

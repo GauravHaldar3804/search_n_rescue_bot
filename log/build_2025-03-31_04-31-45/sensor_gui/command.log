@@ -1,4 +1,0 @@
-Invoking command in '/home/aaditi/ros2_ws/build/sensor_gui': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/aaditi/ros2_ws/build/sensor_gui -- -j4 -l4
-Invoked command in '/home/aaditi/ros2_ws/build/sensor_gui' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/aaditi/ros2_ws/build/sensor_gui -- -j4 -l4
-Invoking command in '/home/aaditi/ros2_ws/build/sensor_gui': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/aaditi/ros2_ws/build/sensor_gui
-Invoked command in '/home/aaditi/ros2_ws/build/sensor_gui' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/aaditi/ros2_ws/build/sensor_gui
