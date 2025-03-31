@@ -1,0 +1,33 @@
+-- The C compiler identification is GNU 13.3.0
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 2.5.3 (/opt/ros/jazzy/share/ament_cmake/cmake)
+-- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+-- Configuring done (0.8s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/aaditi/ros2_ws/build/sensor_gui
+-- Install configuration: ""
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/ament_index/resource_index/package_run_dependencies/sensor_gui
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/ament_index/resource_index/parent_prefix_path/sensor_gui
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/environment/ament_prefix_path.sh
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/environment/ament_prefix_path.dsv
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/environment/path.sh
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/environment/path.dsv
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/local_setup.bash
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/local_setup.sh
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/local_setup.zsh
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/local_setup.dsv
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/package.dsv
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/ament_index/resource_index/packages/sensor_gui
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/cmake/sensor_guiConfig.cmake
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/cmake/sensor_guiConfig-version.cmake
+-- Installing: /home/aaditi/ros2_ws/install/sensor_gui/share/sensor_gui/package.xml
