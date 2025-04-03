@@ -29,9 +29,13 @@ install(
   DESTINATION share/${PROJECT_NAME}/
 )
 
-install(DIRECTORY
-  nodes src
-  DESTINATION lib/${PROJECT_NAME}
+install(PROGRAMS
+  nodes/ultrasonic_node.py
+  nodes/camera_node.py
+  nodes/gps_node.py
+  nodes/imu_node.py
+  DESTINATION lib/${PROJECT_NAME}  # <-- Move nodes directly under lib/main_package
 )
+
 
 ament_package()
