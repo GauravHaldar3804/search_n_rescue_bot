@@ -23,8 +23,14 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# Install individual launch files correctly
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 install(DIRECTORY
-  nodes launch src
+  nodes src
   DESTINATION lib/${PROJECT_NAME}
 )
 
