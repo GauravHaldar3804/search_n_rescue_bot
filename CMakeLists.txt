@@ -35,6 +35,7 @@ install(PROGRAMS
   nodes/gps_node.py
   nodes/imu_node.py
   nodes/sensor_gui.py
+  motorintegration/motorint.py
   DESTINATION lib/${PROJECT_NAME}  # <-- Move nodes directly under lib/main_package
 )
 
