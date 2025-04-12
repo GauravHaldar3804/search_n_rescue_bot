@@ -1,95 +1,91 @@
 #!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import Int32
+
 import RPi.GPIO as GPIO
 import time
+import sys
 
-class MotorControlNode(Node):
-    def __init__(self):
-        super().__init__('motor_control_node')
+# GPIO setup (BCM mode)
+GPIO.setmode(GPIO.BCM)
 
-        # --- Pin Definitions ---
-        self.RPWM = 18  # PWM output for forward direction
-        self.LPWM = 23  # PWM output for reverse direction
-        self.ENL = 17   # Enable left
-        self.ENR = 27   # Enable right
+# Define pins for one BTS7960 motor driver
+MOTOR = {
+    "RPWM": 18,  # Right PWM (forward)
+    "LPWM": 23,  # Left PWM (reverse)
+    "R_EN": 17,  # Right enable
+    "L_EN": 27   # Left enable
+}
 
-        # --- GPIO Setup ---
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.RPWM, GPIO.OUT)
-        GPIO.setup(self.LPWM, GPIO.OUT)
-        GPIO.setup(self.ENL, GPIO.OUT)
-        GPIO.setup(self.ENR, GPIO.OUT)
+# Initialize GPIO pins
+GPIO.setup(MOTOR["RPWM"], GPIO.OUT)
+GPIO.setup(MOTOR["LPWM"], GPIO.OUT)
+GPIO.setup(MOTOR["R_EN"], GPIO.OUT)
+GPIO.setup(MOTOR["L_EN"], GPIO.OUT)
 
-        # Enable motor driver
-        GPIO.output(self.ENL, GPIO.HIGH)
-        GPIO.output(self.ENR, GPIO.HIGH)
+# Set up PWM with 1 kHz frequency
+pwm_r = GPIO.PWM(MOTOR["RPWM"], 1000)
+pwm_l = GPIO.PWM(MOTOR["LPWM"], 1000)
+pwm_r.start(0)
+pwm_l.start(0)
 
-        # Setup PWM at 1000Hz
-        self.pwm_r = GPIO.PWM(self.RPWM, 1000)
-        self.pwm_l = GPIO.PWM(self.LPWM, 1000)
+# Enable motor
+GPIO.output(MOTOR["R_EN"], GPIO.HIGH)
+GPIO.output(MOTOR["L_EN"], GPIO.HIGH)
 
-        self.pwm_r.start(0)
-        self.pwm_l.start(0)
+MAX_RUNTIME = 30 * 60  # 30 minutes in seconds
+start_time = time.time()
 
-        # ROS 2 Subscription
-        self.subscription = self.create_subscription(
-            Int32,
-            'motor_speed',
-            self.speed_callback,
-            10
-        )
+def convert_speed_to_duty(speed_8bit):
+    """Convert 8-bit speed (0-255) to duty cycle (0-100)"""
+    speed_8bit = max(0, min(255, speed_8bit))
+    return int((speed_8bit / 255.0) * 100)
 
-        self.get_logger().info("Motor control node initialized.")
+def soft_start(target_speed, direction=1):
+    """Gradually ramp up motor speed to avoid jerk"""
+    for speed in range(0, target_speed + 1, 10):
+        duty = convert_speed_to_duty(speed if direction == 1 else 0)
+        pwm_r.ChangeDutyCycle(duty if direction == 1 else 0)
+        pwm_l.ChangeDutyCycle(0 if direction == 1 else duty)
+        time.sleep(0.05)  # 500ms ramp-up
 
-    def forward(self, speed_percent):
-        """Move motor forward with specified speed"""
-        self.get_logger().info(f"Moving forward at {speed_percent}% speed")
-        self.pwm_l.ChangeDutyCycle(0)
-        self.pwm_r.ChangeDutyCycle(speed_percent)
+def set_motor_speed(speed, direction=1):
+    """Set motor speed and direction (1 for forward, -1 for reverse)"""
+    duty = convert_speed_to_duty(speed if direction == 1 else 0)
+    pwm_r.ChangeDutyCycle(duty if direction == 1 else 0)
+    pwm_l.ChangeDutyCycle(0 if direction == 1 else duty)
 
-    def backward(self, speed_percent):
-        """Move motor backward with specified speed"""
-        self.get_logger().info(f"Moving backward at {speed_percent}% speed")
-        self.pwm_r.ChangeDutyCycle(0)
-        self.pwm_l.ChangeDutyCycle(speed_percent)
+def stop_motor():
+    """Stop the motor"""
+    pwm_r.ChangeDutyCycle(0)
+    pwm_l.ChangeDutyCycle(0)
 
-    def stop(self):
-        """Stop the motor"""
-        self.get_logger().info("Stopping motor")
-        self.pwm_r.ChangeDutyCycle(0)
-        self.pwm_l.ChangeDutyCycle(0)
+try:
+    print("Single Motor Control Started")
+    print("Enter 'F <speed>' for Forward, 'B <speed>' for Backward, 'S' to Stop")
+    print("Lift motor before starting! Speed range: 0-255")
+    print("Example: F 120")
 
-    def speed_callback(self, msg):
-        """Callback function that controls motor speed"""
-        speed = msg.data  # Get the speed value from message
-        if speed > 0:
-            self.forward(speed)
-        elif speed < 0:
-            self.backward(abs(speed))
+    while True:
+        if time.time() - start_time >= MAX_RUNTIME:
+            print("30-Minute Runtime Limit Reached. Stopping.")
+            stop_motor()
+            break
+
+        command = input().strip().split()
+        if len(command) == 2 and command[0] in ['F', 'B'] and command[1].isdigit():
+            speed = int(command[1])
+            direction = 1 if command[0] == 'F' else -1
+            print(f"Setting motor {'Forward' if direction == 1 else 'Reverse'} at speed {speed}")
+            soft_start(speed, direction)
+        elif command[0] == 'S':
+            print("Stopping motor")
+            stop_motor()
         else:
-            self.stop()
+            print("Invalid command! Use 'F <speed>', 'B <speed>', or 'S'")
 
-    def destroy_node(self):
-        """Cleanup GPIO and stop PWM"""
-        self.stop()
-        self.pwm_r.stop()
-        self.pwm_l.stop()
-        GPIO.cleanup()
-        super().destroy_node()
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = MotorControlNode()
-
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        node.get_logger().info("Keyboard Interrupt, shutting down.")
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
+except KeyboardInterrupt:
+    print("Program stopped by user")
+finally:
+    stop_motor()
+    pwm_r.stop()
+    pwm_l.stop()
+    GPIO.cleanup()
