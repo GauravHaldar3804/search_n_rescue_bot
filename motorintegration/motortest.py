@@ -9,8 +9,8 @@ GPIO.setmode(GPIO.BCM)
 
 # Define pins for one BTS7960 motor driver
 MOTOR = {
-    "RPWM": 18,  # Right PWM (forward)
-    "LPWM": 23,  # Left PWM (reverse)
+    "RPWM": 12,  # Right PWM (forward)
+    "LPWM": 13,  # Left PWM (reverse)
     "R_EN": 17,  # Right enable
     "L_EN": 27   # Left enable
 }
@@ -27,7 +27,7 @@ pwm_l = GPIO.PWM(MOTOR["LPWM"], 1000)
 pwm_r.start(0)
 pwm_l.start(0)
 
-# Enable motor
+# Enable motor (both directions initially)
 GPIO.output(MOTOR["R_EN"], GPIO.HIGH)
 GPIO.output(MOTOR["L_EN"], GPIO.HIGH)
 
@@ -42,21 +42,34 @@ def convert_speed_to_duty(speed_8bit):
 def soft_start(target_speed, direction=1):
     """Gradually ramp up motor speed to avoid jerk"""
     for speed in range(0, target_speed + 1, 10):
-        duty = convert_speed_to_duty(speed if direction == 1 else 0)
-        pwm_r.ChangeDutyCycle(duty if direction == 1 else 0)
-        pwm_l.ChangeDutyCycle(0 if direction == 1 else duty)
+        duty = convert_speed_to_duty(speed)
+        if direction == 1:  # Forward
+            pwm_r.ChangeDutyCycle(duty)
+            pwm_l.ChangeDutyCycle(0)
+            print(f"Forward: RPWM={duty}%, LPWM=0%")
+        else:  # Reverse
+            pwm_r.ChangeDutyCycle(0)
+            pwm_l.ChangeDutyCycle(duty)
+            print(f"Reverse: RPWM=0%, LPWM={duty}%")
         time.sleep(0.05)  # 500ms ramp-up
 
 def set_motor_speed(speed, direction=1):
     """Set motor speed and direction (1 for forward, -1 for reverse)"""
-    duty = convert_speed_to_duty(speed if direction == 1 else 0)
-    pwm_r.ChangeDutyCycle(duty if direction == 1 else 0)
-    pwm_l.ChangeDutyCycle(0 if direction == 1 else duty)
+    duty = convert_speed_to_duty(speed)
+    if direction == 1:  # Forward
+        pwm_r.ChangeDutyCycle(duty)
+        pwm_l.ChangeDutyCycle(0)
+        print(f"Forward: RPWM={duty}%, LPWM=0%")
+    else:  # Reverse
+        pwm_r.ChangeDutyCycle(0)
+        pwm_l.ChangeDutyCycle(duty)
+        print(f"Reverse: RPWM=0%, LPWM={duty}%")
 
 def stop_motor():
     """Stop the motor"""
     pwm_r.ChangeDutyCycle(0)
     pwm_l.ChangeDutyCycle(0)
+    print("Motor stopped: RPWM=0%, LPWM=0%")
 
 try:
     print("Single Motor Control Started")
