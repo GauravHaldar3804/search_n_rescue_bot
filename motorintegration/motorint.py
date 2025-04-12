@@ -3,6 +3,7 @@
 import rclpy
 from rclpy.node import Node
 import time
+import serial
 
 # Import libraries to control GPIO and PCA9685 for PWM
 import RPi.GPIO as GPIO
@@ -10,9 +11,9 @@ import board
 import busio
 from adafruit_pca9685 import PCA9685
 
-class MotorTestNode(Node):
+class MotorControlNode(Node):
     def __init__(self):
-        super().__init__('motor_test_node')
+        super().__init__('motor_control_node')
 
         # --- GPIO Setup for BTS7960 Enable Pins ---
         self.enable_r_pin = 17  # Right enable (R_EN)
@@ -35,11 +36,18 @@ class MotorTestNode(Node):
 
         self.set_motor_speed(0, 1)  # Stop motor initially
 
-        self.timer = self.create_timer(0.1, self.timer_callback)  # Faster callback
-        self.test_state = 0
+        # --- Serial Setup ---
+        self.ser = serial.Serial(
+            port='/dev/ttyS0',  # Use /dev/ttyUSB0 for USB-serial adapter
+            baudrate=9600,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=1
+        )
         self.start_time = time.time()
 
-        self.get_logger().info("Motor test node initialized for one motor with PCA9685. Lift motor before starting!")
+        self.get_logger().info("Motor control node initialized with serial input. Lift motor before starting! Send 'F <speed>', 'B <speed>', or 'S'.")
 
     def convert_speed_to_duty(self, speed_8bit):
         """Convert 8-bit speed value (0–255) to 16-bit duty cycle (0–65535)"""
@@ -64,48 +72,45 @@ class MotorTestNode(Node):
             self.set_motor_speed(speed, direction)
             time.sleep(0.05)  # 500ms ramp-up
 
-    def timer_callback(self):
-        current_time = time.time()
-        if current_time - self.start_time >= 30 * 60:  # 30-minute limit
-            self.get_logger().info("30-Minute Runtime Limit Reached. Stopping.")
-            self.set_motor_speed(0, 1)
-            GPIO.output(self.enable_r_pin, GPIO.LOW)
-            GPIO.output(self.enable_l_pin, GPIO.LOW)
-            return
+    def process_serial_input(self):
+        if self.ser.in_waiting > 0:
+            command = self.ser.readline().decode('utf-8').strip().split()
+            if len(command) == 2 and command[0] in ['F', 'B'] and command[1].isdigit():
+                speed = int(command[1])
+                direction = 1 if command[0] == 'F' else -1
+                self.get_logger().info(f"Received: {'Forward' if direction == 1 else 'Reverse'} at speed {speed}")
+                self.soft_start(speed, direction)
+            elif command[0] == 'S':
+                self.get_logger().info("Received: Stop")
+                self.set_motor_speed(0, 1)
+            else:
+                self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', or 'S'")
 
-        if self.test_state == 0:
-            self.get_logger().info("State 0: Starting motor with soft start.")
-            self.soft_start(120, 1)  # Medium speed forward
-            self.test_state = 1
-
-        elif self.test_state == 1:
-            self.get_logger().info("State 1: Increasing speed.")
-            self.soft_start(220, 1)  # High speed forward
-            self.test_state = 2
-
-        elif self.test_state == 2:
-            self.get_logger().info("State 2: Reversing motor.")
-            self.soft_start(120, -1)  # Medium speed reverse
-            self.test_state = 3
-
-        elif self.test_state == 3:
-            self.get_logger().info("State 3: Stopping motor.")
-            self.set_motor_speed(0, 1)
-            self.test_state = 0
-            self.start_time = time.time()  # Reset timer for next cycle
+    def run(self):
+        while rclpy.ok():
+            if time.time() - self.start_time >= 30 * 60:  # 30-minute limit
+                self.get_logger().info("30-Minute Runtime Limit Reached. Stopping.")
+                self.set_motor_speed(0, 1)
+                GPIO.output(self.enable_r_pin, GPIO.LOW)
+                GPIO.output(self.enable_l_pin, GPIO.LOW)
+                break
+            self.process_serial_input()
+            time.sleep(0.1)  # Small delay to prevent CPU overload
 
     def destroy_node(self):
         self.set_motor_speed(0, 1)
         self.pca.deinit()
         GPIO.cleanup()
+        if self.ser.is_open:
+            self.ser.close()
         super().destroy_node()
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MotorTestNode()
+    node = MotorControlNode()
 
     try:
-        rclpy.spin(node)
+        node.run()
     except KeyboardInterrupt:
         node.get_logger().info("Keyboard Interrupt, shutting down.")
     finally:
