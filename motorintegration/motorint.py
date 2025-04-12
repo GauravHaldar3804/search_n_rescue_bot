@@ -3,7 +3,6 @@
 import rclpy
 from rclpy.node import Node
 import time
-import serial
 
 # Import libraries to control GPIO and PCA9685 for PWM
 import RPi.GPIO as GPIO
@@ -36,18 +35,9 @@ class MotorControlNode(Node):
 
         self.set_motor_speed(0, 1)  # Stop motor initially
 
-        # --- Serial Setup ---
-        self.ser = serial.Serial(
-            port='/dev/ttyS0',  # Use /dev/ttyUSB0 for USB-serial adapter
-            baudrate=9600,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            bytesize=serial.EIGHTBITS,
-            timeout=1
-        )
         self.start_time = time.time()
 
-        self.get_logger().info("Motor control node initialized with serial input. Lift motor before starting! Send 'F <speed>', 'B <speed>', or 'S'.")
+        self.get_logger().info("Motor control node initialized with terminal input. Lift motor before starting! Use 'F <speed>', 'B <speed>', or 'S'.")
 
     def convert_speed_to_duty(self, speed_8bit):
         """Convert 8-bit speed value (0–255) to 16-bit duty cycle (0–65535)"""
@@ -72,20 +62,6 @@ class MotorControlNode(Node):
             self.set_motor_speed(speed, direction)
             time.sleep(0.05)  # 500ms ramp-up
 
-    def process_serial_input(self):
-        if self.ser.in_waiting > 0:
-            command = self.ser.readline().decode('utf-8').strip().split()
-            if len(command) == 2 and command[0] in ['F', 'B'] and command[1].isdigit():
-                speed = int(command[1])
-                direction = 1 if command[0] == 'F' else -1
-                self.get_logger().info(f"Received: {'Forward' if direction == 1 else 'Reverse'} at speed {speed}")
-                self.soft_start(speed, direction)
-            elif command[0] == 'S':
-                self.get_logger().info("Received: Stop")
-                self.set_motor_speed(0, 1)
-            else:
-                self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', or 'S'")
-
     def run(self):
         while rclpy.ok():
             if time.time() - self.start_time >= 30 * 60:  # 30-minute limit
@@ -94,15 +70,28 @@ class MotorControlNode(Node):
                 GPIO.output(self.enable_r_pin, GPIO.LOW)
                 GPIO.output(self.enable_l_pin, GPIO.LOW)
                 break
-            self.process_serial_input()
-            time.sleep(0.1)  # Small delay to prevent CPU overload
+            try:
+                command = input().strip().split()
+                if len(command) == 2 and command[0] in ['F', 'B'] and command[1].isdigit():
+                    speed = int(command[1])
+                    direction = 1 if command[0] == 'F' else -1
+                    self.get_logger().info(f"Received: {'Forward' if direction == 1 else 'Reverse'} at speed {speed}")
+                    self.soft_start(speed, direction)
+                elif command[0] == 'S':
+                    self.get_logger().info("Received: Stop")
+                    self.set_motor_speed(0, 1)
+                else:
+                    self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', or 'S'")
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                self.get_logger().info(f"Error: {e}")
+                time.sleep(0.1)
 
     def destroy_node(self):
         self.set_motor_speed(0, 1)
         self.pca.deinit()
         GPIO.cleanup()
-        if self.ser.is_open:
-            self.ser.close()
         super().destroy_node()
 
 def main(args=None):
