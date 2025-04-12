@@ -9,8 +9,8 @@ GPIO.setmode(GPIO.BCM)
 
 # Define pins for one BTS7960 motor driver
 MOTOR = {
-    "RPWM": 12,  # Right PWM (forward)
-    "LPWM": 13,  # Left PWM (reverse)
+    "RPWM": 18,  # Right PWM (forward)
+    "LPWM": 23,  # Left PWM (reverse)
     "R_EN": 17,  # Right enable
     "L_EN": 27   # Left enable
 }
