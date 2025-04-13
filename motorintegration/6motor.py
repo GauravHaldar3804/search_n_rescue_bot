@@ -22,12 +22,12 @@ class MotorControlNode(Node):
             'motor2_l': 6,   # L_EN for Motor 2
             'motor3_r': 13,  # R_EN for Motor 3
             'motor3_l': 19,  # L_EN for Motor 3
-            'motor4_r': 26,  # R_EN for Motor 4
-            'motor4_l': 21,  # L_EN for Motor 4
-            'motor5_r': 20,  # R_EN for Motor 5
-            'motor5_l': 16,  # L_EN for Motor 5
-            'motor6_r': 12,  # R_EN for Motor 6
-            'motor6_l': 25   # L_EN for Motor 6
+            'motor4_r': 20,  # R_EN for Motors 4, 5, 6
+            'motor4_l': 16,  # L_EN for Motors 4, 5, 6
+            'motor5_r': 20,  # R_EN for Motors 4, 5, 6 (same as motor4_r)
+            'motor5_l': 16,  # L_EN for Motors 4, 5, 6 (same as motor4_l)
+            'motor6_r': 20,  # R_EN for Motors 4, 5, 6 (same as motor4_r)
+            'motor6_l': 16   # L_EN for Motors 4, 5, 6 (same as motor4_l)
         }
 
         GPIO.setmode(GPIO.BCM)
