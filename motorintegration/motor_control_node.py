@@ -130,9 +130,9 @@ class MotorControlNode(Node):
         return False
 
     def move_to_180_degrees(self, speed=15):  # Even lower initial speed
-        self.get_logger().info("Moving motors 2, 3, 5, 6 to 180 degrees with PID")
+        self.get_logger().info("Moving motors 2, 3, 4, 5, 6 to 180 degrees with PID")
         self.reset_encoders()
-        active_motors = [2, 3, 5, 6]
+        active_motors = [2, 3, 4, 5, 6]  # Updated to include motor 4
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.HIGH)
         GPIO.output(self.enable_pins['group1_3_l'], GPIO.HIGH)
         GPIO.output(self.enable_pins['group4_6_r'], GPIO.HIGH)
@@ -167,7 +167,7 @@ class MotorControlNode(Node):
         GPIO.output(self.enable_pins['group1_3_l'], GPIO.LOW)
         GPIO.output(self.enable_pins['group4_6_r'], GPIO.LOW)
         GPIO.output(self.enable_pins['group4_6_l'], GPIO.LOW)
-        self.get_logger().info("Motors 2, 3, 5, 6 at 180 degrees")
+        self.get_logger().info("Motors 2, 3, 4, 5, 6 at 180 degrees")
 
     def run(self):
         while rclpy.ok():
