@@ -56,9 +56,9 @@ class MotorControlNode(Node):
         self.integral = [0] * 6
         self.prev_error = [0] * 6
         self.pid_outputs = [0] * 6
-        self.Kp = 0.2  # Further reduced proportional gain
-        self.Ki = 0.002  # Further reduced integral gain
-        self.Kd = 0.03  # Adjusted derivative gain
+        self.Kp = 0.4  # Increased proportional gain for faster response
+        self.Ki = 0.002  # Kept integral gain low
+        self.Kd = 0.03  # Kept derivative gain
         self.max_speed = 255  # Maximum speed (8-bit)
 
         self.set_all_motor_speeds(0, 1)
@@ -86,21 +86,21 @@ class MotorControlNode(Node):
     def compute_pid(self, motor_id):
         idx = motor_id - 1
         error = self.pulses_per_180 - abs(self.encoder_counts[idx])
-        self.integral[idx] += error * 0.005  # Adjusted time step
-        derivative = (error - self.prev_error[idx]) / 0.005
+        self.integral[idx] += error * 0.002  # Adjusted time step
+        derivative = (error - self.prev_error[idx]) / 0.002
         self.pid_outputs[idx] = (self.Kp * error) + (self.Ki * self.integral[idx]) + (self.Kd * derivative)
         self.prev_error[idx] = error
-        speed = min(self.max_speed, max(10, int(self.pid_outputs[idx])))  # Minimum speed to ensure movement
+        speed = min(self.max_speed, max(10, int(self.pid_outputs[idx])))  # Minimum speed
         self.get_logger().debug(f"Motor {motor_id} - Error: {error}, PID Output: {speed}")
         return speed
 
     def soft_start(self, target_speed, direction=1, motor_ids=None):
         if motor_ids is None:
             motor_ids = range(1, 7)
-        for speed in range(0, target_speed + 1, 2):  # Even slower increment
+        for speed in range(0, target_speed + 1, 10):  # Faster increment
             for motor_id in motor_ids:
                 self.set_motor_speed(motor_id, speed, direction)
-            time.sleep(0.15)  # Longer delay
+            time.sleep(0.05)  # Shorter delay
 
     def read_encoders(self):
         self.serial_port.write("READ\n".encode())
@@ -129,10 +129,10 @@ class MotorControlNode(Node):
             return True
         return False
 
-    def move_to_180_degrees(self, speed=15):  # Even lower initial speed
+    def move_to_180_degrees(self, speed=50):  # Increased initial speed
         self.get_logger().info("Moving motors 2, 3, 4, 5, 6 to 180 degrees with PID")
         self.reset_encoders()
-        active_motors = [2, 3, 4, 5, 6]  # Updated to include motor 4
+        active_motors = [2, 3, 4, 5, 6]
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.HIGH)
         GPIO.output(self.enable_pins['group1_3_l'], GPIO.HIGH)
         GPIO.output(self.enable_pins['group4_6_r'], GPIO.HIGH)
@@ -140,7 +140,7 @@ class MotorControlNode(Node):
         self.soft_start(speed, direction=1, motor_ids=active_motors)
 
         start_time = time.time()
-        max_duration = 90  # Extended timeout
+        max_duration = 60  # Adjusted timeout
 
         while time.time() - start_time < max_duration:
             if not self.read_encoders():
@@ -160,7 +160,7 @@ class MotorControlNode(Node):
 
             if all_at_target:
                 break
-            time.sleep(0.005)  # Faster loop
+            time.sleep(0.002)  # Faster loop
 
         self.set_all_motor_speeds(0, 1)
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.LOW)
