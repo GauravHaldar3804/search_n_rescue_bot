@@ -54,6 +54,7 @@ class MotorControlNode(Node):
         # Encoder counts (from Arduino)
         self.encoder_counts = [0] * 6
         self.pulses_per_90 = 533  # 2130 PPR / 4
+        self.pulses_per_180 = 1066  # 2 * 533 pulses for 180 degrees
 
         self.set_all_motor_speeds(0, 1)  # Stop motors
         self.get_logger().info("Motor control node initialized. Lift motors before starting! Use 'F <speed>', 'B <speed>', 'S', or 'A' for auto sequence.")
@@ -125,28 +126,37 @@ class MotorControlNode(Node):
         self.set_all_motor_speeds(0, 1)
         self.get_logger().info("All motors at 90 degrees")
 
-    def phased_rotation(self, speed=100):
-        self.get_logger().info("Starting phased rotation: Motors 1-3, then 4-6 with 90° phase")
+    def tripod_gait(self, speed=100, duration=30):
+        self.get_logger().info("Starting tripod gait with 180-degree phase")
         self.reset_encoders()
-        # Start motors 1-3
-        self.soft_start(speed, direction=1, motor_ids=[1, 2, 3])
-        # Wait for 90° phase difference (533 pulses)
-        while any(abs(self.encoder_counts[i]) < self.pulses_per_90 for i in range(3)):
-            if not self.read_encoders():
-                self.get_logger().error("Failed to read encoders")
-                break
-            time.sleep(0.01)
-        # Start motors 4-6
-        self.soft_start(speed, direction=1, motor_ids=[4, 5, 6])
-        # Run for 30 seconds (adjust as needed)
         start_time = time.time()
-        while time.time() - start_time < 30:
+
+        # Define tripod groups: Group 1 (motors 1, 3, 5), Group 2 (motors 2, 4, 6)
+        tripod_group1 = [1, 3, 5]
+        tripod_group2 = [2, 4, 6]
+
+        # Soft start both groups in opposite directions
+        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Forward
+        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Backward
+
+        while time.time() - start_time < duration:
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
+
+            # Maintain 180-degree phase difference (1066 pulses)
+            for i in tripod_group1:
+                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
+                    self.set_motor_speed(i, 0, 1)  # Stop if exceeded
+            for i in tripod_group2:
+                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
+                    self.set_motor_speed(i, 0, -1)  # Stop if exceeded
+
+            # Adjust speeds to maintain phase if needed (basic control)
             time.sleep(0.01)
+
         self.set_all_motor_speeds(0, 1)
-        self.get_logger().info("Phased rotation complete")
+        self.get_logger().info("Tripod gait complete")
 
     def run(self):
         while rclpy.ok():
@@ -164,7 +174,7 @@ class MotorControlNode(Node):
                     self.get_logger().info("Starting auto sequence")
                     self.move_to_90_degrees()
                     time.sleep(1)
-                    self.phased_rotation()
+                    self.tripod_gait()  # Replace phased_rotation with tripod gait
                 else:
                     self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', 'S', or 'A'")
             except KeyboardInterrupt:
