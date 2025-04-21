@@ -36,6 +36,7 @@ install(PROGRAMS
   nodes/imu_node.py
   nodes/sensor_gui.py
   motorintegration/motorint.py
+  motorintegration/motortest.py
   DESTINATION lib/${PROJECT_NAME}  # <-- Move nodes directly under lib/main_package
 )
 
