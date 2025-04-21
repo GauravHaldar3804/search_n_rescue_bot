@@ -45,8 +45,8 @@ class MotorControlNode(Node):
             'motor2_r': 2, 'motor2_l': 3,
             'motor3_r': 4, 'motor3_l': 5,
             'motor4_r': 6, 'motor4_l': 7,
-            'motor5_r': 8, 'motor5_l': 9,
-            'motor6_r': 10, 'motor6_l': 11
+            'motor5_r': 10, 'motor5_l': 11,
+            'motor6_r': 8, 'motor6_l': 9
         }
 
         # Encoder counts
