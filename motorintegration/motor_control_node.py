@@ -26,7 +26,7 @@ class MotorControlNode(Node):
         self.enable_pins = {
             'group1_3_r': 17,  # Right enables for motors 1, 2, 3
             'group1_3_l': 27,  # Left enables for motors 1, 2, 3
-            'group4_6_r': 21,  # Right enables for motors 4, 5, 6
+            'group4_6_r': 20,  # Right enables for motors 4, 5, 6
             'group4_6_l': 16   # Left enables for motors 4, 5, 6
         }
         GPIO.setmode(GPIO.BCM)
