@@ -22,17 +22,13 @@ class MotorControlNode(Node):
             self.get_logger().error(f"Failed to open serial port {port}: {e}")
             raise
 
-        # GPIO Setup for BTS7960 Enable Pins
+        # GPIO Setup for BTS7960 Enable Pins (grouped as per hardware)
         self.enable_pins = {
-            'motor1_r': 17, 'motor1_l': 27,
-            'motor2_r': 5, 'motor2_l': 6,
-            'motor3_r': 13, 'motor3_l': 19,
-            'motor4_r': 20, 'motor4_l': 16,
-            'motor5_r': 20, 'motor5_l': 16,
-            'motor6_r': 20, 'motor6_l': 16
+            'group1_3': 17,  # Motors 1, 2, 3 enables shorted to 17 and 27
+            'group5_6': 21   # Motors 5, 6 enables shorted to 21 and 16
         }
         GPIO.setmode(GPIO.BCM)
-        for pin in set(self.enable_pins.values()):
+        for pin in self.enable_pins.values():
             GPIO.setup(pin, GPIO.OUT)
             GPIO.output(pin, GPIO.HIGH)
 
@@ -115,6 +111,9 @@ class MotorControlNode(Node):
         self.get_logger().info("Moving motors 2, 3, 5, 6 to 90 degrees")
         self.reset_encoders()  # Ensure all start from zero
         active_motors = [2, 3, 5, 6]  # Ignore motors 1 and 4
+        # Enable groups
+        GPIO.output(self.enable_pins['group1_3'], GPIO.HIGH)  # Enable motors 1, 2, 3
+        GPIO.output(self.enable_pins['group5_6'], GPIO.HIGH)  # Enable motors 5, 6
         self.soft_start(speed, direction=1, motor_ids=active_motors)
         target_pulses = self.pulses_per_90
         while any(abs(self.encoder_counts[i-1]) < target_pulses for i in active_motors):
@@ -122,10 +121,14 @@ class MotorControlNode(Node):
                 self.get_logger().error("Failed to read encoders")
                 break
             for i in active_motors:
-                if abs(self.encoder_counts[i-1]) >= target_pulses:
+                idx = i - 1  # 0-based index
+                if abs(self.encoder_counts[idx]) >= target_pulses:
                     self.set_motor_speed(i, 0, 1)  # Stop motor
+                    self.get_logger().info(f"Stopped motor {i} at {self.encoder_counts[idx]} pulses")
             time.sleep(0.01)
         self.set_all_motor_speeds(0, 1)  # Ensure all stop
+        GPIO.output(self.enable_pins['group1_3'], GPIO.LOW)  # Disable groups after stopping
+        GPIO.output(self.enable_pins['group5_6'], GPIO.LOW)
         self.get_logger().info("Motors 2, 3, 5, 6 at 90 degrees")
 
     def run(self):
@@ -138,6 +141,8 @@ class MotorControlNode(Node):
                 elif command[0] == 'S':
                     self.get_logger().info("Stop")
                     self.set_all_motor_speeds(0, 1)
+                    GPIO.output(self.enable_pins['group1_3'], GPIO.LOW)
+                    GPIO.output(self.enable_pins['group5_6'], GPIO.LOW)
                 else:
                     self.get_logger().info("Invalid command! Use 'A' to move to 90 degrees or 'S' to stop")
             except KeyboardInterrupt:
@@ -148,6 +153,8 @@ class MotorControlNode(Node):
 
     def destroy_node(self):
         self.set_all_motor_speeds(0, 1)
+        GPIO.output(self.enable_pins['group1_3'], GPIO.LOW)
+        GPIO.output(self.enable_pins['group5_6'], GPIO.LOW)
         self.pca.deinit()
         GPIO.cleanup()
         self.serial_port.close()
