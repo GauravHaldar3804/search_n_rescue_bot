@@ -56,9 +56,9 @@ class MotorControlNode(Node):
         self.integral = [0] * 6
         self.prev_error = [0] * 6
         self.pid_outputs = [0] * 6
-        self.Kp = 0.5  # Proportional gain
-        self.Ki = 0.01  # Integral gain
-        self.Kd = 0.1  # Derivative gain
+        self.Kp = 0.3  # Reduced proportional gain
+        self.Ki = 0.005  # Reduced integral gain
+        self.Kd = 0.05  # Reduced derivative gain
         self.max_speed = 255  # Maximum speed (8-bit)
 
         self.set_all_motor_speeds(0, 1)
@@ -96,10 +96,10 @@ class MotorControlNode(Node):
     def soft_start(self, target_speed, direction=1, motor_ids=None):
         if motor_ids is None:
             motor_ids = range(1, 7)
-        for speed in range(0, target_speed + 1, 10):
+        for speed in range(0, target_speed + 1, 5):  # Slower increment
             for motor_id in motor_ids:
                 self.set_motor_speed(motor_id, speed, direction)
-            time.sleep(0.05)
+            time.sleep(0.1)  # Longer delay for smoother start
 
     def read_encoders(self):
         self.serial_port.write("READ\n".encode())
@@ -128,7 +128,7 @@ class MotorControlNode(Node):
             return True
         return False
 
-    def move_to_180_degrees(self, speed=50):
+    def move_to_180_degrees(self, speed=20):  # Reduced initial speed
         self.get_logger().info("Moving motors 2, 3, 5, 6 to 180 degrees with PID")
         self.reset_encoders()
         active_motors = [2, 3, 5, 6]
@@ -139,7 +139,7 @@ class MotorControlNode(Node):
         self.soft_start(speed, direction=1, motor_ids=active_motors)
 
         start_time = time.time()
-        max_duration = 30  # Maximum runtime in seconds to prevent infinite loops
+        max_duration = 60  # Increased timeout for slower movement
 
         while time.time() - start_time < max_duration:
             if not self.read_encoders():
@@ -159,7 +159,7 @@ class MotorControlNode(Node):
 
             if all_at_target:
                 break
-            time.sleep(0.01)
+            time.sleep(0.02)  # Increased sleep for smoother control
 
         self.set_all_motor_speeds(0, 1)
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.LOW)
