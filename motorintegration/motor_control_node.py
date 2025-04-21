@@ -14,7 +14,7 @@ class MotorControlNode(Node):
         super().__init__('motor_control_node')
 
         # Serial communication with Arduino
-        port = '/dev/ttyUSB0'  # Updated to match the detected port
+        port = '/dev/ttyUSB0'
         try:
             self.serial_port = serial.Serial(port, 115200, timeout=1)
             time.sleep(2)  # Wait for Arduino to initialize
@@ -96,6 +96,7 @@ class MotorControlNode(Node):
                 for i, count in enumerate(counts):
                     if count.startswith(f"Enc{i+1}:"):
                         self.encoder_counts[i] = int(count.split(':')[1])
+                self.get_logger().info(f"Encoder counts: {self.encoder_counts}")  # Debug log
                 return True
             except Exception as e:
                 self.get_logger().error(f"Error parsing encoder data: {e}")
@@ -131,13 +132,14 @@ class MotorControlNode(Node):
         self.reset_encoders()
         start_time = time.time()
 
-        # Define tripod groups: Group 1 (motors 1, 3, 5), Group 2 (motors 2, 4, 6)
-        tripod_group1 = [1, 3, 5]
-        tripod_group2 = [2, 4, 6]
+        # Reverse tripod groups: Group 1 (motors 2, 4, 6), Group 2 (motors 1, 3, 5)
+        tripod_group1 = [2, 4, 6]  # Start these first
+        tripod_group2 = [1, 3, 5]  # Start these second
 
-        # Soft start both groups in opposite directions
-        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Forward
-        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Backward
+        # Soft start Group 1 forward, then Group 2 backward
+        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Motors 2, 4, 6 forward
+        time.sleep(0.1)  # Small delay to allow initial movement
+        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Motors 1, 3, 5 backward
 
         while time.time() - start_time < duration:
             if not self.read_encoders():
@@ -152,7 +154,11 @@ class MotorControlNode(Node):
                 if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
                     self.set_motor_speed(i, 0, -1)  # Stop if exceeded
 
-            # Adjust speeds to maintain phase if needed (basic control)
+            # Log phase difference for debugging
+            phase_diff = max(abs(self.encoder_counts[i-1] - self.encoder_counts[j-1]) 
+                           for i in tripod_group1 for j in tripod_group2)
+            self.get_logger().info(f"Phase difference: {phase_diff} pulses")
+
             time.sleep(0.01)
 
         self.set_all_motor_speeds(0, 1)
@@ -174,7 +180,7 @@ class MotorControlNode(Node):
                     self.get_logger().info("Starting auto sequence")
                     self.move_to_90_degrees()
                     time.sleep(1)
-                    self.tripod_gait()  # Replace phased_rotation with tripod gait
+                    self.tripod_gait()  # Test with reversed groups
                 else:
                     self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', 'S', or 'A'")
             except KeyboardInterrupt:
