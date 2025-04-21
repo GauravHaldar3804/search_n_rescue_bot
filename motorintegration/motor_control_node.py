@@ -96,7 +96,7 @@ class MotorControlNode(Node):
                 for i, count in enumerate(counts):
                     if count.startswith(f"Enc{i+1}:"):
                         self.encoder_counts[i] = int(count.split(':')[1])
-                self.get_logger().info(f"Encoder counts: {self.encoder_counts}")  # Debug log
+                self.get_logger().info(f"Encoder counts: {self.encoder_counts}")
                 return True
             except Exception as e:
                 self.get_logger().error(f"Error parsing encoder data: {e}")
@@ -113,14 +113,14 @@ class MotorControlNode(Node):
 
     def move_to_90_degrees(self, speed=50):
         self.get_logger().info("Moving all motors to 90 degrees")
-        self.reset_encoders()
-        target_pulses = self.pulses_per_90  # 533 pulses
+        self.reset_encoders()  # Ensure all start from zero
         self.soft_start(speed, direction=1)
-        while any(abs(self.encoder_counts[i]) < target_pulses for i in range(6)):
+        target_pulses = self.pulses_per_90
+        while any(abs(self.encoder_counts[i]) < target_pulses for i in [1, 2, 3, 4, 5] if i not in [0, 3]):  # Ignore Enc1 and Enc4
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
-            for i in range(6):
+            for i in [1, 2, 4, 5]:  # Motors 2, 3, 5, 6 (0-based: 1, 2, 4, 5)
                 if abs(self.encoder_counts[i]) >= target_pulses:
                     self.set_motor_speed(i + 1, 0, 1)  # Stop motor
             time.sleep(0.01)
@@ -132,32 +132,34 @@ class MotorControlNode(Node):
         self.reset_encoders()
         start_time = time.time()
 
-        # Reverse tripod groups: Group 1 (motors 2, 4, 6), Group 2 (motors 1, 3, 5)
-        tripod_group1 = [2, 4, 6]  # Start these first
-        tripod_group2 = [1, 3, 5]  # Start these second
+        # Redefine tripod groups, ignoring motors 1 and 4
+        tripod_group1 = [2, 6]  # Motors 2 and 6 (forward)
+        tripod_group2 = [3, 5]  # Motors 3 and 5 (backward)
 
-        # Soft start Group 1 forward, then Group 2 backward
-        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Motors 2, 4, 6 forward
-        time.sleep(0.1)  # Small delay to allow initial movement
-        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Motors 1, 3, 5 backward
+        # Soft start with opposite directions
+        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Group 1 forward
+        time.sleep(0.1)  # Small delay
+        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Group 2 backward
 
         while time.time() - start_time < duration:
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
 
-            # Maintain 180-degree phase difference (1066 pulses)
+            # Check phase and stop if 180 degrees reached
             for i in tripod_group1:
                 if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
-                    self.set_motor_speed(i, 0, 1)  # Stop if exceeded
+                    self.set_motor_speed(i, 0, 1)  # Stop forward
             for i in tripod_group2:
                 if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
-                    self.set_motor_speed(i, 0, -1)  # Stop if exceeded
+                    self.set_motor_speed(i, 0, -1)  # Stop backward
 
-            # Log phase difference for debugging
-            phase_diff = max(abs(self.encoder_counts[i-1] - self.encoder_counts[j-1]) 
-                           for i in tripod_group1 for j in tripod_group2)
-            self.get_logger().info(f"Phase difference: {phase_diff} pulses")
+            # Switch phases every 180 degrees
+            if all(abs(self.encoder_counts[i-1]) >= self.pulses_per_180 for i in tripod_group1):
+                self.get_logger().info("Switching phases")
+                self.soft_start(speed, direction=-1, motor_ids=tripod_group1)  # Reverse Group 1
+                self.soft_start(speed, direction=1, motor_ids=tripod_group2)  # Reverse Group 2
+                self.reset_encoders()  # Reset counts for next cycle
 
             time.sleep(0.01)
 
@@ -180,7 +182,7 @@ class MotorControlNode(Node):
                     self.get_logger().info("Starting auto sequence")
                     self.move_to_90_degrees()
                     time.sleep(1)
-                    self.tripod_gait()  # Test with reversed groups
+                    self.tripod_gait()
                 else:
                     self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', 'S', or 'A'")
             except KeyboardInterrupt:
