@@ -11,11 +11,16 @@ from adafruit_pca9685 import PCA9685
 
 class MotorControlNode(Node):
     def __init__(self):
-        super().__init__('motor_control_node')  # Correctly initialize the Node with node_name
+        super().__init__('motor_control_node')
 
         # Serial communication with Arduino
-        self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
-        time.sleep(2)  # Wait for Arduino to initialize
+        port = '/dev/ttyUSB0'  # Updated to match the detected port
+        try:
+            self.serial_port = serial.Serial(port, 115200, timeout=1)
+            time.sleep(2)  # Wait for Arduino to initialize
+        except serial.SerialException as e:
+            self.get_logger().error(f"Failed to open serial port {port}: {e}")
+            raise
 
         # GPIO Setup for BTS7960 Enable Pins
         self.enable_pins = {
