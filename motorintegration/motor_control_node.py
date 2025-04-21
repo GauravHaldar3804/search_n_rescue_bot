@@ -10,8 +10,8 @@ import busio
 from adafruit_pca9685 import PCA9685
 
 class MotorControlNode(Node):
-    def _init_(self):
-        super()._init_('motor_control_node')
+    def __init__(self):
+        super().__init__('motor_control_node')  # Correctly initialize the Node with node_name
 
         # Serial communication with Arduino
         self.serial_port = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
