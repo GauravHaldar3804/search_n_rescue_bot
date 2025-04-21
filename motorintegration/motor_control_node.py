@@ -22,7 +22,7 @@ class MotorControlNode(Node):
             self.get_logger().error(f"Failed to open serial port {port}: {e}")
             raise
 
-        # GPIO Setup for Enable Pins (corrected based on your wiring)
+        # GPIO Setup for Enable Pins
         self.enable_pins = {
             'group1_3_r': 17,  # Right enables for motors 1, 2, 3
             'group1_3_l': 27,  # Left enables for motors 1, 2, 3
@@ -39,7 +39,7 @@ class MotorControlNode(Node):
         self.pca = PCA9685(i2c)
         self.pca.frequency = 1000
 
-        # PWM channels
+        # PWM channels (corrected as per your input)
         self.pwm_channels = {
             'motor1_r': 0, 'motor1_l': 1,
             'motor2_r': 2, 'motor2_l': 3,
@@ -49,13 +49,20 @@ class MotorControlNode(Node):
             'motor6_r': 8, 'motor6_l': 9
         }
 
-        # Encoder counts
+        # Encoder counts and PID state
         self.encoder_counts = [0] * 6
         self.pulses_per_rev = 2130
         self.pulses_per_180 = 1065  # Half of 2130 for 180 degrees
+        self.integral = [0] * 6
+        self.prev_error = [0] * 6
+        self.pid_outputs = [0] * 6
+        self.Kp = 0.5  # Proportional gain
+        self.Ki = 0.01  # Integral gain
+        self.Kd = 0.1  # Derivative gain
+        self.max_speed = 255  # Maximum speed (8-bit)
 
         self.set_all_motor_speeds(0, 1)
-        self.get_logger().info("Motor control initialized. Use 'A' to move to 180 degrees, 'S' to stop.")
+        self.get_logger().info("Motor control initialized. Use 'A' to move to 180 degrees with PID, 'S' to stop.")
 
     def convert_speed_to_duty(self, speed_8bit):
         speed_8bit = max(0, min(255, speed_8bit))
@@ -75,6 +82,16 @@ class MotorControlNode(Node):
     def set_all_motor_speeds(self, speed, direction=1):
         for motor_id in range(1, 7):
             self.set_motor_speed(motor_id, speed, direction)
+
+    def compute_pid(self, motor_id):
+        idx = motor_id - 1
+        error = self.pulses_per_180 - abs(self.encoder_counts[idx])
+        self.integral[idx] += error * 0.01  # Integral term with time step
+        derivative = (error - self.prev_error[idx]) / 0.01  # Derivative term
+        self.pid_outputs[idx] = (self.Kp * error) + (self.Ki * self.integral[idx]) + (self.Kd * derivative)
+        self.prev_error[idx] = error
+        speed = min(self.max_speed, max(0, int(self.pid_outputs[idx])))
+        return speed
 
     def soft_start(self, target_speed, direction=1, motor_ids=None):
         if motor_ids is None:
@@ -104,12 +121,15 @@ class MotorControlNode(Node):
         response = self.serial_port.readline().decode().strip()
         if response == "RESET_OK":
             self.encoder_counts = [0] * 6
-            self.get_logger().info("Encoders reset to zero")
+            self.integral = [0] * 6
+            self.prev_error = [0] * 6
+            self.pid_outputs = [0] * 6
+            self.get_logger().info("Encoders and PID state reset to zero")
             return True
         return False
 
     def move_to_180_degrees(self, speed=50):
-        self.get_logger().info("Moving motors 2, 3, 5, 6 to 180 degrees")
+        self.get_logger().info("Moving motors 2, 3, 5, 6 to 180 degrees with PID")
         self.reset_encoders()
         active_motors = [2, 3, 5, 6]
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.HIGH)
@@ -117,17 +137,30 @@ class MotorControlNode(Node):
         GPIO.output(self.enable_pins['group4_6_r'], GPIO.HIGH)
         GPIO.output(self.enable_pins['group4_6_l'], GPIO.HIGH)
         self.soft_start(speed, direction=1, motor_ids=active_motors)
-        target_pulses = self.pulses_per_180
-        while any(abs(self.encoder_counts[i-1]) < target_pulses for i in active_motors):
+
+        start_time = time.time()
+        max_duration = 30  # Maximum runtime in seconds to prevent infinite loops
+
+        while time.time() - start_time < max_duration:
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
+
+            all_at_target = True
             for i in active_motors:
                 idx = i - 1
-                if abs(self.encoder_counts[idx]) >= target_pulses:
+                if abs(self.encoder_counts[idx]) < self.pulses_per_180:
+                    all_at_target = False
+                    speed = self.compute_pid(i)
+                    self.set_motor_speed(i, speed, 1)
+                else:
                     self.set_motor_speed(i, 0, 1)
-                    self.get_logger().info(f"Stopped motor {i} at {self.encoder_counts[idx]} pulses")
+                    self.get_logger().info(f"Motor {i} reached 180 degrees at {self.encoder_counts[idx]} pulses")
+
+            if all_at_target:
+                break
             time.sleep(0.01)
+
         self.set_all_motor_speeds(0, 1)
         GPIO.output(self.enable_pins['group1_3_r'], GPIO.LOW)
         GPIO.output(self.enable_pins['group1_3_l'], GPIO.LOW)
