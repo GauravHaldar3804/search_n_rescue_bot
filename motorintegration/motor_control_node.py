@@ -116,7 +116,7 @@ class MotorControlNode(Node):
         self.reset_encoders()  # Ensure all start from zero
         self.soft_start(speed, direction=1)
         target_pulses = self.pulses_per_90
-        while any(abs(self.encoder_counts[i]) < target_pulses for i in [1, 2, 3, 4, 5] if i not in [0, 3]):  # Ignore Enc1 and Enc4
+        while any(abs(self.encoder_counts[i]) < target_pulses for i in [1, 2, 4, 5]):  # Ignore Enc1 and Enc4 (indices 0, 3)
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
@@ -136,30 +136,31 @@ class MotorControlNode(Node):
         tripod_group1 = [2, 6]  # Motors 2 and 6 (forward)
         tripod_group2 = [3, 5]  # Motors 3 and 5 (backward)
 
-        # Soft start with opposite directions
-        self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Group 1 forward
-        time.sleep(0.1)  # Small delay
-        self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Group 2 backward
-
+        phase = 1  # 1 for forward/backward, -1 for backward/forward
         while time.time() - start_time < duration:
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
 
-            # Check phase and stop if 180 degrees reached
-            for i in tripod_group1:
-                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
-                    self.set_motor_speed(i, 0, 1)  # Stop forward
-            for i in tripod_group2:
-                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
-                    self.set_motor_speed(i, 0, -1)  # Stop backward
+            # Soft start based on current phase
+            if phase == 1:
+                self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Forward
+                self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Backward
+            else:
+                self.soft_start(speed, direction=-1, motor_ids=tripod_group1)  # Backward
+                self.soft_start(speed, direction=1, motor_ids=tripod_group2)  # Forward
 
-            # Switch phases every 180 degrees
-            if all(abs(self.encoder_counts[i-1]) >= self.pulses_per_180 for i in tripod_group1):
+            # Check for phase switch
+            max_pulses = max(abs(self.encoder_counts[i-1]) for i in tripod_group1 + tripod_group2)
+            if max_pulses >= self.pulses_per_180:
                 self.get_logger().info("Switching phases")
-                self.soft_start(speed, direction=-1, motor_ids=tripod_group1)  # Reverse Group 1
-                self.soft_start(speed, direction=1, motor_ids=tripod_group2)  # Reverse Group 2
+                phase *= -1  # Toggle phase
                 self.reset_encoders()  # Reset counts for next cycle
+
+            # Force stop if any motor exceeds limit
+            for i in tripod_group1 + tripod_group2:
+                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
+                    self.set_motor_speed(i, 0, 1 if phase == 1 else -1)
 
             time.sleep(0.01)
 
