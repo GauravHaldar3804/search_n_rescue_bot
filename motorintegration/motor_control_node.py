@@ -54,10 +54,9 @@ class MotorControlNode(Node):
         # Encoder counts (from Arduino)
         self.encoder_counts = [0] * 6
         self.pulses_per_90 = 533  # 2130 PPR / 4
-        self.pulses_per_180 = 1066  # 2 * 533 pulses for 180 degrees
 
-        self.set_all_motor_speeds(0, 1)  # Stop motors
-        self.get_logger().info("Motor control node initialized. Lift motors before starting! Use 'F <speed>', 'B <speed>', 'S', or 'A' for auto sequence.")
+        self.set_all_motor_speeds(0, 1)  # Stop all motors initially
+        self.get_logger().info("Motor control node initialized. Lift motors before starting! Use 'A' to move to 90 degrees, 'S' to stop.")
 
     def convert_speed_to_duty(self, speed_8bit):
         speed_8bit = max(0, min(255, speed_8bit))
@@ -83,7 +82,8 @@ class MotorControlNode(Node):
             motor_ids = range(1, 7)
         for speed in range(0, target_speed + 1, 10):
             for motor_id in motor_ids:
-                self.set_motor_speed(motor_id, speed, direction)
+                if motor_id not in [1, 4]:  # Ignore motors 1 and 4
+                    self.set_motor_speed(motor_id, speed, direction)
             time.sleep(0.05)
 
     def read_encoders(self):
@@ -112,80 +112,34 @@ class MotorControlNode(Node):
         return False
 
     def move_to_90_degrees(self, speed=50):
-        self.get_logger().info("Moving all motors to 90 degrees")
+        self.get_logger().info("Moving motors 2, 3, 5, 6 to 90 degrees")
         self.reset_encoders()  # Ensure all start from zero
-        self.soft_start(speed, direction=1)
+        active_motors = [2, 3, 5, 6]  # Ignore motors 1 and 4
+        self.soft_start(speed, direction=1, motor_ids=active_motors)
         target_pulses = self.pulses_per_90
-        while any(abs(self.encoder_counts[i]) < target_pulses for i in [1, 2, 4, 5]):  # Ignore Enc1 and Enc4 (indices 0, 3)
+        while any(abs(self.encoder_counts[i-1]) < target_pulses for i in active_motors):
             if not self.read_encoders():
                 self.get_logger().error("Failed to read encoders")
                 break
-            for i in [1, 2, 4, 5]:  # Motors 2, 3, 5, 6 (0-based: 1, 2, 4, 5)
-                if abs(self.encoder_counts[i]) >= target_pulses:
-                    self.set_motor_speed(i + 1, 0, 1)  # Stop motor
+            for i in active_motors:
+                if abs(self.encoder_counts[i-1]) >= target_pulses:
+                    self.set_motor_speed(i, 0, 1)  # Stop motor
             time.sleep(0.01)
-        self.set_all_motor_speeds(0, 1)
-        self.get_logger().info("All motors at 90 degrees")
-
-    def tripod_gait(self, speed=100, duration=30):
-        self.get_logger().info("Starting tripod gait with 180-degree phase")
-        self.reset_encoders()
-        start_time = time.time()
-
-        # Redefine tripod groups, ignoring motors 1 and 4
-        tripod_group1 = [2, 6]  # Motors 2 and 6 (forward)
-        tripod_group2 = [3, 5]  # Motors 3 and 5 (backward)
-
-        phase = 1  # 1 for forward/backward, -1 for backward/forward
-        while time.time() - start_time < duration:
-            if not self.read_encoders():
-                self.get_logger().error("Failed to read encoders")
-                break
-
-            # Soft start based on current phase
-            if phase == 1:
-                self.soft_start(speed, direction=1, motor_ids=tripod_group1)  # Forward
-                self.soft_start(speed, direction=-1, motor_ids=tripod_group2)  # Backward
-            else:
-                self.soft_start(speed, direction=-1, motor_ids=tripod_group1)  # Backward
-                self.soft_start(speed, direction=1, motor_ids=tripod_group2)  # Forward
-
-            # Check for phase switch
-            max_pulses = max(abs(self.encoder_counts[i-1]) for i in tripod_group1 + tripod_group2)
-            if max_pulses >= self.pulses_per_180:
-                self.get_logger().info("Switching phases")
-                phase *= -1  # Toggle phase
-                self.reset_encoders()  # Reset counts for next cycle
-
-            # Force stop if any motor exceeds limit
-            for i in tripod_group1 + tripod_group2:
-                if abs(self.encoder_counts[i-1]) >= self.pulses_per_180:
-                    self.set_motor_speed(i, 0, 1 if phase == 1 else -1)
-
-            time.sleep(0.01)
-
-        self.set_all_motor_speeds(0, 1)
-        self.get_logger().info("Tripod gait complete")
+        self.set_all_motor_speeds(0, 1)  # Ensure all stop
+        self.get_logger().info("Motors 2, 3, 5, 6 at 90 degrees")
 
     def run(self):
         while rclpy.ok():
             try:
                 command = input().strip().split()
-                if len(command) == 2 and command[0] in ['F', 'B'] and command[1].isdigit():
-                    speed = int(command[1])
-                    direction = 1 if command[0] == 'F' else -1
-                    self.get_logger().info(f"All motors {'Forward' if direction == 1 else 'Reverse'} at speed {speed}")
-                    self.soft_start(speed, direction)
+                if command[0] == 'A':
+                    self.get_logger().info("Starting move to 90 degrees")
+                    self.move_to_90_degrees()
                 elif command[0] == 'S':
                     self.get_logger().info("Stop")
                     self.set_all_motor_speeds(0, 1)
-                elif command[0] == 'A':
-                    self.get_logger().info("Starting auto sequence")
-                    self.move_to_90_degrees()
-                    time.sleep(1)
-                    self.tripod_gait()
                 else:
-                    self.get_logger().info("Invalid command! Use 'F <speed>', 'B <speed>', 'S', or 'A'")
+                    self.get_logger().info("Invalid command! Use 'A' to move to 90 degrees or 'S' to stop")
             except KeyboardInterrupt:
                 break
             except Exception as e:
